@@ -40,28 +40,46 @@ LOG_LEVEL=info
 
 ## 使用
 
-### 启动节点服务
+### 方式 A：本地 CLI 调用（推荐用于单机开发）
 
 ```bash
+# 1. 构建
+npm run build
+
+# 2. 直接执行任务
+npx clawnode exec "创建一个 Express Hello World 项目"
+
+# 3. 执行并发送通知到渠道
+npx clawnode run "创建一个 Express Hello World 项目"
+
+# 4. 使用指定 Session
+npx clawnode exec -s session-123 "添加用户认证功能"
+
+# 5. 指定工作目录
+npx clawnode exec -w /path/to/project "添加新的 API 端点"
+```
+
+**CLI 命令说明**：
+
+| 命令 | 说明 |
+|------|------|
+| `clawnode exec <prompt>` | 执行 Claude Code 命令 |
+| `clawnode run <prompt>` | 执行并发送通知（= exec --notify） |
+| `clawnode start` | 启动节点服务（推送/轮询模式） |
+| `clawnode status` | 显示节点状态 |
+| `clawnode config` | 显示当前配置 |
+| `clawnode ws-send` | 通过 WebSocket 发送消息到渠道 |
+| `clawnode ws-generate-keys` | 生成 ED25519 密钥对 |
+
+详细 CLI 文档请查看 [CLI_USAGE.md](CLI_USAGE.md)。
+
+### 方式 B：节点服务模式（推荐用于生产环境）
+
+```bash
+# 启动节点
 npm start
 # 或
 npx clawnode start
-```
-
-### 命令行选项
-
-```bash
-# 查看状态
-npx clawnode status
-
-# 查看配置
-npx clawnode config
-
-# 直接执行命令
-npx clawnode exec "写一个 hello world 函数"
-
-# 启动服务（自定义端口和轮询间隔）
-npx clawnode start -p 3001 -i 5000
 ```
 
 ## 项目结构
@@ -74,30 +92,100 @@ src/
 ├── bin/
 │   └── clawnode.ts    # CLI 入口
 ├── modules/
-│   ├── task-poller.ts     # 任务轮询器
-│   ├── executor.ts        # 任务执行器
-│   ├── session-manager.ts # Session 管理器
-│   ├── hook-receiver.ts   # Hook 回调接收器
-│   ├── callback-client.ts # 回调客户端
-│   └── log-streamer.ts    # 日志流式输出
-└── utils/
-    └── logger.ts      # 日志工具
+│   ├── task-poller.ts      # 任务轮询器（轮询模式）
+│   ├── task-receiver.ts    # 任务接收器（推送模式）
+│   ├── executor.ts         # 任务执行器
+│   ├── session-manager.ts  # Session 管理器
+│   ├── hook-receiver.ts    # Hook 回调接收器
+│   ├── callback-client.ts  # 回调客户端
+│   ├── websocket-sender.ts # WebSocket 消息发送器
+│   └── log-streamer.ts     # 日志流式输出
+├── utils/
+│   └── logger.ts           # 日志工具
+└── config/
+    └── index.ts            # 配置
 ```
 
 ## 核心功能
 
-- **Task Poller**: 从 OpenClaw 服务器轮询任务（Pull 模式）
+- **Task Poller**: 从 OpenClaw 服务器轮询任务（轮询模式）
+- **Task Receiver**: 接收 OpenClaw 推送的任务（推送模式）
 - **Executor**: 调用 Claude Code 执行任务
-- **Session Manager**: 管理 Session 持续交互
-- **Hook Receiver**: 接收和处理 Hook 回调
+- **Session Manager**: 管理 Session 生命周期（继续/暂停/恢复/锁定/删除）
+- **Hook Receiver**: 接收和处理 Claude Code Hook 回调
 - **Callback Client**: 将执行结果回传到 OpenClaw
 - **Log Streamer**: 日志流式输出
+- **WebSocket Sender**: 通过 WebSocket call 帧直接向 Gateway 发送消息（无需修改 OpenClaw）
+
+## 运行模式
+
+| 模式 | 说明 | 配置 |
+|------|------|------|
+| `push` | 推送模式，OpenClaw 直接推送任务 | `RUN_MODE=push` |
+| `poll` | 轮询模式，ClawNode 轮询获取任务 | `RUN_MODE=poll` |
+| `hybrid` | 混合模式，同时支持推送和轮询 | `RUN_MODE=hybrid`（默认） |
+
+## Session 管理
+
+Session 不会自动删除，必须由用户通过指令显式控制：
+
+| 状态 | 说明 | 能否继续 | 能否删除 |
+|------|------|----------|----------|
+| `active` | 活跃 | ✅ | ✅ |
+| `paused` | 暂停 | ❌（需先恢复） | ✅ |
+| `locked` | 锁定 | ✅ | ❌（需先解锁） |
+| `closed` | 已关闭 | ❌ | ✅ |
+
+详细文档请查看 [SESSION_MANAGEMENT.md](SESSION_MANAGEMENT.md) 和 [CLI_USAGE.md](CLI_USAGE.md)。
 
 ## 任务状态机
 
 ```
-PENDING → RUNNING → FAILED → RETRY → SUCCESS
+PENDING → RUNNING → SUCCESS
+              ↓
+            FAILED
+              ↓
+            RETRY → RUNNING → SUCCESS
 ```
+
+## 通知渠道
+
+支持以下通知渠道：
+
+- 钉钉
+- 企业微信
+- 飞书
+- Telegram
+
+配置方式请查看 [CLI_USAGE.md](CLI_USAGE.md#通知配置)。
+
+## WebSocket 发送消息
+
+通过 WebSocket call 帧直接向 Gateway 发送消息，支持所有 Gateway 配置的渠道：
+
+- WhatsApp
+- Telegram
+- Discord
+- Slack
+- Signal
+- LINE
+- 飞书
+- 钉钉
+- 企业微信
+
+### 快速开始
+
+```bash
+# 1. 生成密钥对
+npx clawnode ws-generate-keys
+
+# 2. 配置 .env 中的 DEVICE_TOKEN, DEVICE_ID, PRIVATE_KEY, PUBLIC_KEY
+
+# 3. 发送消息
+npx clawnode ws-send --to "+8613800138000" --message "Hello" --channel whatsapp
+```
+
+详细文档请查看 [WEBSOCKET_SEND_GUIDE.md](WEBSOCKET_SEND_GUIDE.md)。
 
 ## 开发
 
@@ -115,3 +203,14 @@ npm test
 ## License
 
 MIT
+
+## 相关文档
+
+- [CLI 使用指南](CLI_USAGE.md) - CLI 命令详细说明
+- [快速启动](QUICKSTART.md) - 1 分钟快速开始
+- [Session 管理](SESSION_MANAGEMENT.md) - Session 生命周期管理
+- [Session 快速参考](SESSION_QUICK_REFERENCE.md) - Session 命令速查
+- [推送模式部署](PUSH_MODE_DEPLOYMENT.md) - 推送模式部署指南
+- [架构说明](ARCHITECTURE.md) - 系统架构说明
+- [PRD 开发流程](PRD_FLOW.md) - PRD 驱动开发流程
+- [WebSocket 发送指南](WEBSOCKET_SEND_GUIDE.md) - WebSocket 消息发送功能

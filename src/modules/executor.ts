@@ -16,27 +16,59 @@ export class Executor {
 
   /**
    * 执行任务
+   * @param task 任务定义
+   * @param onOutput 实时输出回调
+   * @param sessionId Session ID（用于继续会话）
    */
-  async execute(task: Task, onOutput?: (output: string) => void): Promise<ExecutionResult> {
+  async execute(
+    task: Task,
+    onOutput?: (output: string) => void,
+    sessionId?: string
+  ): Promise<ExecutionResult> {
     const taskLogger = logger.task(task.id)
-    taskLogger.info('Starting task execution')
+    taskLogger.info('Starting task execution', { sessionId })
 
     return new Promise<ExecutionResult>((resolve) => {
       // 使用 claude 命令执行
       const args: string[] = []
 
       if (task.prompt) {
-        args.push('-p', task.prompt)
+        args.push('-p', task.prompt, '--dangerously-skip-permissions')
       }
 
       // 添加继续模式以支持 session
-      if (task.sessionId) {
+      const shouldContinue = sessionId || task.sessionId
+      if (shouldContinue) {
         args.push('--continue')
       }
 
-      const child = spawn('claude', args, {
+      // Windows 平台使用 .cmd 扩展名
+      const isWindows = process.platform === 'win32'
+      const claudeCommand = isWindows ? 'claude.cmd' : 'claude'
+
+      // 传递环境变量，确保 CLAUDE_CODE_GIT_BASH_PATH 被设置
+      const env = { ...process.env }
+      if (isWindows && !env.CLAUDE_CODE_GIT_BASH_PATH) {
+        try {
+          const fs = require('fs')
+          const bashPaths = [
+            'D:\\Program Files\\Git\\bin\\bash.exe',
+            'C:\\Program Files\\Git\\bin\\bash.exe'
+          ]
+          for (const p of bashPaths) {
+            if (fs.existsSync(p)) {
+              env.CLAUDE_CODE_GIT_BASH_PATH = p
+              break
+            }
+          }
+        } catch {}
+      }
+
+      const child = spawn(claudeCommand, args, {
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env }
+        env,
+        cwd: task.metadata?.workingDirectory as string || undefined,
+        shell: true
       })
 
       let output = ''
@@ -58,7 +90,7 @@ export class Executor {
         taskLogger.warn(`Stderr: ${chunk.substring(0, 100)}...`)
       })
 
-      child.on('error', (err) => {
+      child.on('error', (err: Error) => {
         taskLogger.error(`Spawn error: ${err.message}`)
         resolve({
           taskId: task.id,
@@ -68,7 +100,7 @@ export class Executor {
         })
       })
 
-      child.on('close', (code) => {
+      child.on('close', (code: number | null) => {
         const status = code === 0 ? TaskStatus.SUCCESS : TaskStatus.FAILED
         taskLogger.info(`Task completed with exit code ${code}`)
 
@@ -100,22 +132,42 @@ export class Executor {
   }
 
   /**
-   * 执行 Session 消息
+   * 执行 Session 消息（继续会话）
+   * @param sessionId Session ID
+   * @param message 要发送的消息
+   * @param onOutput 实时输出回调
    */
-  async executeSessionMessage(sessionId: string, message: string): Promise<string> {
+  async executeSessionMessage(
+    sessionId: string,
+    message: string,
+    onOutput?: (output: string) => void
+  ): Promise<string> {
     return new Promise<string>((resolve) => {
-      const child = spawn('claude', ['--continue', '-p', message], {
-        stdio: ['pipe', 'pipe', 'pipe']
+      // Windows 平台需要使用 .cmd 扩展名和 shell 模式
+      const isWindows = process.platform === 'win32'
+      const claudeCommand = isWindows ? 'claude.cmd' : 'claude'
+
+      const child = spawn(claudeCommand, ['--continue', '-p', message], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: isWindows
       })
 
       let output = ''
 
       child.stdout.on('data', (data: Buffer) => {
-        output += data.toString()
+        const chunk = data.toString()
+        output += chunk
+        if (onOutput) {
+          onOutput(chunk)
+        }
       })
 
       child.stderr.on('data', (data: Buffer) => {
-        output += data.toString()
+        const chunk = data.toString()
+        output += chunk
+        if (onOutput) {
+          onOutput(chunk)
+        }
       })
 
       child.on('close', () => {

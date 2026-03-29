@@ -3,7 +3,10 @@ import { NodeConfig } from './types'
 
 dotenv.config()
 
-export const config: NodeConfig = {
+export const config: NodeConfig & {
+  receiverPort: number
+  mode: 'push' | 'poll' | 'hybrid'
+} = {
   openClawUrl: process.env.OPENCLAW_URL || 'http://localhost:3000',
   nodeId: process.env.NODE_ID || 'node-001',
   nodeSecret: process.env.NODE_SECRET || '',
@@ -11,12 +14,14 @@ export const config: NodeConfig = {
   hookPort: parseInt(process.env.HOOK_PORT || '3001', 10),
   execTimeout: parseInt(process.env.EXEC_TIMEOUT || '300000', 10),
   claudeApiKey: process.env.CLAUDE_API_KEY || '',
-  logLevel: process.env.LOG_LEVEL || 'info'
+  logLevel: process.env.LOG_LEVEL || 'info',
+  receiverPort: parseInt(process.env.RECEIVER_PORT || '3000', 10),
+  mode: (process.env.RUN_MODE as 'push' | 'poll' | 'hybrid') || 'hybrid'
 }
 
 export function validateConfig(): boolean {
   if (!config.nodeSecret) {
-    console.warn('NODE_SECRET is not configured')
+    console.warn('NODE_SECRET is not configured (required for push mode)')
   }
   if (!config.claudeApiKey) {
     console.warn('CLAUDE_API_KEY is not configured')

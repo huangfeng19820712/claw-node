@@ -4,7 +4,8 @@
   "description": "ClawNode - OpenClaw 执行节点代理，负责接收任务、调用 Claude Code 执行并回传结果",
   "main": "dist/index.js",
   "bin": {
-    "clawnode": "./dist/bin/clawnode.js"
+    "clawnode": "./dist/bin/clawnode.js",
+    "clawnode-ws": "./dist/bin/clawnode-ws.js"
   },
   "scripts": {
     "build": "tsc",
@@ -29,7 +30,8 @@
     "commander": "^11.1.0",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
@@ -37,6 +39,7 @@
     "@types/node": "^20.10.0",
     "@types/supertest": "^7.2.0",
     "@types/uuid": "^9.0.7",
+    "@types/ws": "^8.18.1",
     "jest": "^29.7.0",
     "supertest": "^7.2.2",
     "ts-jest": "^29.1.1",

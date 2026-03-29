@@ -46,18 +46,18 @@ describe('SessionManager', () => {
   })
 
   describe('updateActivity', () => {
-    it('应该更新 session 的活动时间', () => {
+    it('应该更新 session 的活动时间', async () => {
       const session = sessionManager.createSession('task-123')
       const beforeUpdate = session.lastActivityAt
 
       // 等待一小段时间
-      setTimeout(() => {
-        sessionManager.updateActivity(session.id)
-        const updated = sessionManager.getSession(session.id)
+      await new Promise(resolve => setTimeout(resolve, 10))
 
-        expect(updated?.lastActivityAt).not.toBe(beforeUpdate)
-        expect(updated?.messageCount).toBe(1)
-      }, 10)
+      sessionManager.updateActivity(session.id)
+      const updated = sessionManager.getSession(session.id)
+
+      expect(updated?.lastActivityAt).not.toBe(beforeUpdate)
+      expect(updated?.messageCount).toBe(1)
     })
 
     it('应该增加消息计数', () => {
@@ -154,7 +154,8 @@ describe('SessionManager', () => {
 
   describe('cleanup', () => {
     it('应该清理过期的非活跃 session', () => {
-      const session = sessionManager.createSession('task-123')
+      // 创建允许自动清理的 Session
+      const session = sessionManager.createSession('task-123', undefined, true) // autoCleanup=true
       sessionManager.pauseSession(session.id)
 
       // 模拟过期

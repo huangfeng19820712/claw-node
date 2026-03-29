@@ -38,7 +38,13 @@ describe('集成测试', () => {
   describe('Task 类型', () => {
     it('应该支持所有任务类型', () => {
       expect(TaskType.EXECUTE).toBe('EXECUTE')
-      expect(TaskType.SESSION).toBe('SESSION')
+      expect(TaskType.SESSION_CONTINUE).toBe('SESSION_CONTINUE')
+      expect(TaskType.SESSION_PAUSE).toBe('SESSION_PAUSE')
+      expect(TaskType.SESSION_RESUME).toBe('SESSION_RESUME')
+      expect(TaskType.SESSION_DELETE).toBe('SESSION_DELETE')
+      expect(TaskType.SESSION_LOCK).toBe('SESSION_LOCK')
+      expect(TaskType.SESSION_UNLOCK).toBe('SESSION_UNLOCK')
+      expect(TaskType.SESSION_LIST).toBe('SESSION_LIST')
       expect(TaskType.QUERY).toBe('QUERY')
     })
   })
