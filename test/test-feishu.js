@@ -1,4 +1,4 @@
-const { WebSocketSender } = require('./dist/modules/websocket-sender')
+const { WebSocketSender } = require('../dist/modules/websocket-sender')
 const fs = require('fs')
 const path = require('path')
 const os = require('os')

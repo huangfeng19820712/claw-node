@@ -207,10 +207,7 @@ MIT
 ## 相关文档
 
 - [CLI 使用指南](CLI_USAGE.md) - CLI 命令详细说明
-- [快速启动](QUICKSTART.md) - 1 分钟快速开始
 - [Session 管理](SESSION_MANAGEMENT.md) - Session 生命周期管理
-- [Session 快速参考](SESSION_QUICK_REFERENCE.md) - Session 命令速查
-- [推送模式部署](PUSH_MODE_DEPLOYMENT.md) - 推送模式部署指南
 - [架构说明](ARCHITECTURE.md) - 系统架构说明
-- [PRD 开发流程](PRD_FLOW.md) - PRD 驱动开发流程
 - [WebSocket 发送指南](WEBSOCKET_SEND_GUIDE.md) - WebSocket 消息发送功能
+- [Agent Request 指南](AGENT_REQUEST_GUIDE.md) - agent.request 事件使用
