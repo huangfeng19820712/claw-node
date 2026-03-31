@@ -10,33 +10,23 @@ npm install
 
 ## 配置
 
-复制 `.env.example` 为 `.env` 并配置：
+在 `~/.clawnode/config.env` 中配置：
 
 ```bash
-# OpenClaw 服务器地址
-OPENCLAW_URL=http://localhost:3000
+# 工作目录
+WORKDIR=E:/fwwork/javaws
 
-# 节点标识
-NODE_ID=node-001
+# 飞书配置
+FEISHU_APP_ID=cli_xxx
+FEISHU_APP_SECRET=xxx
+NOTIFY_TARGET=ou_xxx
 
-# 节点密钥（用于身份验证）
-NODE_SECRET=your-secret-key
-
-# 任务轮询间隔（毫秒）
-POLL_INTERVAL=5000
-
-# Hook 回调服务端口
-HOOK_PORT=3001
-
-# 执行超时时间（毫秒）
-EXEC_TIMEOUT=300000
-
-# Claude Code 配置
-CLAUDE_API_KEY=your-claude-api-key
-
-# 日志级别
-LOG_LEVEL=info
+# Gateway 配置
+GATEWAY_HOST=localhost
+GATEWAY_PORT=18789
 ```
+
+详细配置请查看 [node-feishu-download.md](node-feishu-download.md)。
 
 ## 使用
 
@@ -46,17 +36,14 @@ LOG_LEVEL=info
 # 1. 构建
 npm run build
 
-# 2. 直接执行任务
+# 2. 飞书开发任务（自动下载附件并执行）
+npx clawnode feishu-exec --prompt "实现计算器功能"
+
+# 3. 直接执行任务（不发送通知）
 npx clawnode exec "创建一个 Express Hello World 项目"
 
-# 3. 执行并发送通知到渠道
+# 4. 执行并发送通知到渠道
 npx clawnode run "创建一个 Express Hello World 项目"
-
-# 4. 使用指定 Session
-npx clawnode exec -s session-123 "添加用户认证功能"
-
-# 5. 指定工作目录
-npx clawnode exec -w /path/to/project "添加新的 API 端点"
 ```
 
 **CLI 命令说明**：
@@ -64,12 +51,12 @@ npx clawnode exec -w /path/to/project "添加新的 API 端点"
 | 命令 | 说明 |
 |------|------|
 | `clawnode exec <prompt>` | 执行 Claude Code 命令 |
-| `clawnode run <prompt>` | 执行并发送通知（= exec --notify） |
+| `clawnode run <prompt>` | 执行并发送通知 |
+| `clawnode feishu-exec` | 飞书开发任务（有附件下载，无附件直接执行） |
 | `clawnode start` | 启动节点服务（推送/轮询模式） |
 | `clawnode status` | 显示节点状态 |
 | `clawnode config` | 显示当前配置 |
 | `clawnode ws-send` | 通过 WebSocket 发送消息到渠道 |
-| `clawnode ws-generate-keys` | 生成 ED25519 密钥对 |
 
 详细 CLI 文档请查看 [CLI_USAGE.md](CLI_USAGE.md)。
 
@@ -99,6 +86,7 @@ src/
 │   ├── hook-receiver.ts    # Hook 回调接收器
 │   ├── callback-client.ts  # 回调客户端
 │   ├── websocket-sender.ts # WebSocket 消息发送器
+│   ├── feishu-downloader.ts # 飞书附件下载器
 │   └── log-streamer.ts     # 日志流式输出
 ├── utils/
 │   └── logger.ts           # 日志工具

@@ -28,6 +28,8 @@ clawnode <command> --help
 | `start` | 启动节点服务（推送/轮询模式） |
 | `exec` | 直接执行 Claude Code 命令 |
 | `run` | 执行并发送通知（exec --notify 的快捷方式） |
+| `feishu-exec` | 飞书开发任务（有附件下载，无附件直接执行） |
+| `ws-send` | 通过 WebSocket 发送消息到渠道 |
 | `status` | 显示节点状态 |
 | `config` | 显示当前配置 |
 
@@ -100,6 +102,54 @@ clawnode run -w /path/to/existing-project "添加新的功能模块"
 
 # 继续会话并发送通知
 clawnode run -s session-xyz "继续开发用户管理功能"
+```
+
+---
+
+## feishu-exec 命令
+
+执行飞书开发任务（有附件先下载再执行，无附件直接执行），自动发送通知到飞书。
+
+**注意**: 需要先运行 `openclaw node run` 注册 clawnode 身份。
+
+### 基本用法
+
+```bash
+clawnode feishu-exec --prompt "实现计算器功能"
+```
+
+### 选项
+
+| 选项 | 说明 | 必填 |
+|------|------|------|
+| `--prompt <text>` | 开发任务描述 | 是 |
+| `--message-id <id>` | 飞书消息 ID（有附件时使用） | 有附件时 |
+| `--file-key <key>` | 飞书文件 Key（有附件时使用） | 有附件时 |
+| `--workdir <dir>` | 工作目录（默认使用 WORKDIR 配置） | 否 |
+| `--notify-to <to>` | 通知目标（默认使用 NOTIFY_TARGET 配置） | 否 |
+
+### 示例
+
+```bash
+# 纯文字消息
+clawnode feishu-exec --prompt "实现一个网页计算器"
+
+# 有附件（下载后执行）
+clawnode feishu-exec --prompt "实现 PRD 中的功能" --message-id "msg_xxx" --file-key "file_xxx"
+
+# 指定工作目录
+clawnode feishu-exec --workdir "E:/fwwork/javaws" --prompt "创建新项目"
+```
+
+### 配置
+
+在 `~/.clawnode/config.env` 中配置：
+
+```bash
+WORKDIR=E:/fwwork/javaws
+NOTIFY_TARGET=ou_xxxxxxxxxxxxxxxx
+FEISHU_APP_ID=cli_xxx
+FEISHU_APP_SECRET=xxx
 ```
 
 ---

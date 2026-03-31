@@ -1,4 +1,5 @@
 import { spawn } from 'child_process'
+import * as fs from 'fs'
 import { Task, TaskStatus, ExecutionResult } from '../types'
 import { logger } from '../utils/logger'
 import { CallbackClient } from './callback-client'
@@ -30,10 +31,10 @@ export class Executor {
 
     return new Promise<ExecutionResult>((resolve) => {
       // 使用 claude 命令执行
-      const args: string[] = []
+      const args: string[] = ['--dangerously-skip-permissions']
 
       if (task.prompt) {
-        args.push('-p', task.prompt, '--dangerously-skip-permissions')
+        args.push('-p', task.prompt)
       }
 
       // 添加继续模式以支持 session
@@ -46,28 +47,49 @@ export class Executor {
       const isWindows = process.platform === 'win32'
       const claudeCommand = isWindows ? 'claude.cmd' : 'claude'
 
-      // 传递环境变量，确保 CLAUDE_CODE_GIT_BASH_PATH 被设置
-      const env = { ...process.env }
+      // 使用 process.env 并确保必要的环境变量存在
+      const env: { [key: string]: string } = {}
+      for (const key in process.env) {
+        env[key] = process.env[key] as string
+      }
+
+      // 确保 PATH 存在
+      if (!env.PATH && !env.Path) {
+        env.PATH = 'C:\\Windows\\system32;C:\\Windows'
+      }
+
       if (isWindows && !env.CLAUDE_CODE_GIT_BASH_PATH) {
-        try {
-          const fs = require('fs')
-          const bashPaths = [
-            'D:\\Program Files\\Git\\bin\\bash.exe',
-            'C:\\Program Files\\Git\\bin\\bash.exe'
-          ]
-          for (const p of bashPaths) {
-            if (fs.existsSync(p)) {
-              env.CLAUDE_CODE_GIT_BASH_PATH = p
-              break
-            }
+        const bashPaths = [
+          'D:\\Program Files\\Git\\bin\\bash.exe',
+          'C:\\Program Files\\Git\\bin\\bash.exe'
+        ]
+        for (const p of bashPaths) {
+          if (fs.existsSync(p)) {
+            env.CLAUDE_CODE_GIT_BASH_PATH = p
+            break
           }
-        } catch {}
+        }
+      }
+
+      // 验证 cwd 是否存在
+      const cwd = task.metadata?.workingDirectory as string | undefined
+      let effectiveCwd = cwd
+      if (cwd) {
+        try {
+          if (!fs.existsSync(cwd)) {
+            console.error(`[Executor] Warning: CWD does not exist: ${cwd}`)
+            effectiveCwd = process.cwd()
+            console.error(`[Executor] Using: ${effectiveCwd}`)
+          }
+        } catch {
+          effectiveCwd = process.cwd()
+        }
       }
 
       const child = spawn(claudeCommand, args, {
         stdio: ['ignore', 'pipe', 'pipe'],
         env,
-        cwd: task.metadata?.workingDirectory as string || undefined,
+        cwd: effectiveCwd,
         shell: true
       })
 
