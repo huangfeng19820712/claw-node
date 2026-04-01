@@ -2,7 +2,13 @@
 
 ## 概述
 
-ClawNode 支持从飞书下载用户发送的附件，并通过 Claude Code 执行开发任务，实现"飞书发送 PRD → Node 下载文件 → 执行开发 → 返回结果"的完整流程。
+ClawNode 支持从飞书下载附件，并通过 Claude Code 执行开发任务，支持三种任务类型：
+
+1. **纯文字任务** - 直接执行 prompt
+2. **消息附件任务** - 下载飞书消息附件后执行
+3. **云文档任务** - 下载飞书云文档后执行
+
+实现"飞书发送需求 → Node 下载文件 → 执行开发 → 返回结果"的完整流程。
 
 ## 架构图
 
@@ -78,7 +84,14 @@ openclaw node run --display-name "clawnode"
 ### 命令格式
 
 ```bash
-clawnode feishu-exec --prompt "任务描述" [--message-id xxx] [--file-key xxx]
+# 纯文字任务
+clawnode feishu-exec --prompt "任务描述"
+
+# 消息附件任务
+clawnode feishu-exec --message-id xxx --file-key xxx --prompt "任务描述"
+
+# 云文档任务
+clawnode feishu-exec --file-token xxx --prompt "任务描述"
 ```
 
 ### 参数说明
@@ -86,8 +99,9 @@ clawnode feishu-exec --prompt "任务描述" [--message-id xxx] [--file-key xxx]
 | 参数 | 说明 | 必填 |
 |------|------|------|
 | `--prompt` | 开发任务描述 | 是 |
-| `--message-id` | 飞书消息 ID（有附件时使用） | 有附件时 |
-| `--file-key` | 飞书文件 Key（有附件时使用） | 有附件时 |
+| `--message-id` | 飞书消息 ID（消息附件时使用） | 消息附件时 |
+| `--file-key` | 飞书文件 Key（消息附件时使用） | 消息附件时 |
+| `--file-token` | 飞书云文档 Token（云文档时使用） | 云文档时 |
 | `--workdir` | 工作目录（默认使用配置中的 WORKDIR） | 否 |
 | `--notify-to` | 通知目标（默认使用配置中的 NOTIFY_TARGET） | 否 |
 | `--app-id` | 飞书 App ID（可使用配置） | 否 |
@@ -107,7 +121,13 @@ clawnode feishu-exec --prompt "实现一个计算器功能"
 clawnode feishu-exec --prompt "实现 PRD 中的功能" --message-id "msg_xxx" --file-key "file_xxx"
 ```
 
-### 情况3：指定工作目录和通知目标
+### 情况3：飞书云文档
+
+```bash
+clawnode feishu-exec --file-token "FKfPdDb3pobslTxKr9acIk1YnPg" --prompt "实现云文档中的功能"
+```
+
+### 情况4：指定工作目录和通知目标
 
 ```bash
 clawnode feishu-exec \
@@ -118,14 +138,14 @@ clawnode feishu-exec \
 
 ## Gateway 调用示例（TOOLS.md）
 
-### 统一处理（有附件和无附件）
+### 统一处理（三种任务类型）
 
 ```markdown
 ## 开发任务处理
 
 当收到飞书消息时，使用 `feishu-exec` 统一处理：
 
-**有附件：**
+**消息附件：**
 
 ```
 action: run
@@ -133,7 +153,15 @@ node: "clawnode"
 command: ["clawnode", "feishu-exec", "--message-id", "{message_id}", "--file-key", "{file_key}", "--prompt", "实现功能，完成后返回结果"]
 ```
 
-**无附件：**
+**云文档：**
+
+```
+action: run
+node: "clawnode"
+command: ["clawnode", "feishu-exec", "--file-token", "{file_token}", "--prompt", "实现云文档中的功能"]
+```
+
+**纯文字：**
 
 ```
 action: run

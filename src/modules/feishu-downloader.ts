@@ -174,3 +174,100 @@ export async function downloadFeishuFile(
     }
   }
 }
+
+/**
+ * 下载飞书云文档
+ */
+async function downloadCloudFile(
+  accessToken: string,
+  fileToken: string,
+  outputPath: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const url = `https://open.feishu.cn/open-apis/drive/v1/files/${fileToken}/download`
+
+    const req = https.get(
+      url,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+      (res) => {
+        // 检查响应状态
+        if (res.statusCode !== 200) {
+          reject(new Error(`下载失败: HTTP ${res.statusCode}`))
+          return
+        }
+
+        // 检查内容类型
+        const contentType = res.headers['content-type'] || ''
+        if (contentType.includes('application/json')) {
+          let data = ''
+          res.on('data', (chunk) => (data += chunk))
+          res.on('end', () => {
+            try {
+              const json = JSON.parse(data)
+              reject(new Error(`下载失败: ${json.msg || JSON.stringify(json)}`))
+            } catch {
+              reject(new Error(`下载失败: ${data}`))
+            }
+          })
+          return
+        }
+
+        // 下载文件
+        const chunks: Buffer[] = []
+        res.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
+        res.on('end', () => {
+          try {
+            const buffer = Buffer.concat(chunks)
+            writeFileSync(outputPath, buffer)
+            resolve()
+          } catch (e: any) {
+            reject(new Error(`保存文件失败: ${e.message}`))
+          }
+        })
+      }
+    )
+
+    req.on('error', reject)
+    req.setTimeout(30000, () => {
+      req.destroy()
+      reject(new Error('下载超时'))
+    })
+  })
+}
+
+/**
+ * 下载飞书云文档到本地
+ */
+export async function downloadFeishuCloudDoc(
+  fileToken: string,
+  outputPath: string,
+  options: FeishuDownloadOptions
+): Promise<DownloadResult> {
+  try {
+    // 1. 获取 Access Token
+    console.error(`[FeishuDownload] 获取 Access Token...`)
+    const accessToken = await getAccessToken(options)
+    console.error(`[FeishuDownload] Token 获取成功`)
+
+    // 2. 下载云文档
+    console.error(`[FeishuDownload] 开始下载云文档: fileToken=${fileToken}`)
+    console.error(`[FeishuDownload] 保存到: ${outputPath}`)
+    await downloadCloudFile(accessToken, fileToken, outputPath)
+
+    console.error(`[FeishuDownload] 下载完成`)
+    return {
+      success: true,
+      filePath: outputPath,
+    }
+  } catch (e: any) {
+    console.error(`[FeishuDownload] 下载失败: ${e.message}`)
+    return {
+      success: false,
+      error: e.message,
+    }
+  }
+}

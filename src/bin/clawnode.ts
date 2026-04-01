@@ -391,22 +391,24 @@ program
 
 program
   .command('feishu-exec')
-  .description('执行飞书开发任务（有附件先下载再执行，无附件直接执行）')
-  .option('--message-id <id>', '飞书消息 ID（可选，有附件时使用）')
-  .option('--file-key <key>', '飞书文件 Key（可选，有附件时使用）')
+  .description('执行飞书开发任务（支持：纯文字任务、下载消息附件执行、下载飞书云文档执行）')
+  .option('--message-id <id>', '飞书消息 ID（消息附件时使用）')
+  .option('--file-key <key>', '飞书文件 Key（消息附件时使用）')
+  .option('--file-token <token>', '飞书云文档 Token（云文档时使用）')
   .option('--workdir <dir>', '工作目录（默认当前目录）')
   .option('--prompt <text>', '开发任务描述')
   .option('--notify-to <to>', '通知目标（飞书 open_id）')
   .option('--app-id <id>', '飞书 App ID (env: FEISHU_APP_ID)')
   .option('--app-secret <secret>', '飞书 App Secret (env: FEISHU_APP_SECRET)')
   .action(async (options) => {
-    const { downloadFeishuFile, getFeishuConfig } = await import('../modules/feishu-downloader')
+    const { downloadFeishuFile, downloadFeishuCloudDoc, getFeishuConfig } = await import('../modules/feishu-downloader')
     const { CallbackClient } = await import('../modules/callback-client')
     const { Executor } = await import('../modules/executor')
     const { TaskStatus, TaskType } = await import('../types')
 
-    // 判断是否有附件
-    const hasAttachment = !!(options.messageId && options.fileKey)
+    // 判断下载类型
+    const hasMessageAttachment = !!(options.messageId && options.fileKey)
+    const hasCloudDoc = !!options.fileToken
     // 如果没有指定工作目录，使用配置中的默认目录
     const workdir = (options.workdir || config.workdir).replace(/\\/, '/')
 
@@ -417,33 +419,56 @@ program
       process.exit(1)
     }
 
-    // 第一步：如果有附件，先下载
-    if (hasAttachment) {
-      // 获取飞书配置
-      let appId = options.appId || ''
-      let appSecret = options.appSecret || ''
+    // 获取飞书配置
+    let appId = options.appId || ''
+    let appSecret = options.appSecret || ''
 
-      if (!appId || !appSecret) {
-        const config = getFeishuConfig()
-        if (config) {
-          appId = appId || config.appId
-          appSecret = appSecret || config.appSecret
-        }
+    if (!appId || !appSecret) {
+      const feishuConfig = getFeishuConfig()
+      if (feishuConfig) {
+        appId = appId || feishuConfig.appId
+        appSecret = appSecret || feishuConfig.appSecret
       }
+    }
 
-      if (!appId || !appSecret) {
-        console.error('Error: FEISHU_APP_ID and FEISHU_APP_SECRET are required for attachment download')
-        process.exit(1)
-      }
+    if (!appId || !appSecret) {
+      console.error('Error: FEISHU_APP_ID and FEISHU_APP_SECRET are required')
+      process.exit(1)
+    }
 
+    const feishuConfig = { appId, appSecret }
+
+    // 第一步：下载文件（如果有）
+    if (hasMessageAttachment) {
+      // 情况2：下载消息附件
       const outputPath = `${workdir}/${options.messageId}.md`
 
-      console.log(`\n[Step 1/2] 下载飞书附件...`)
+      console.log(`\n[Step 1/2] 下载飞书消息附件...`)
+
       const downloadResult = await downloadFeishuFile(
         options.messageId,
         options.fileKey,
         outputPath,
-        { appId, appSecret }
+        feishuConfig
+      )
+
+      if (!downloadResult.success) {
+        console.error(`\n❌ 下载失败: ${downloadResult.error}`)
+        process.exit(1)
+      }
+      console.log(`✅ 下载成功: ${outputPath}`)
+
+      prompt = `根据 ${outputPath} ${prompt}`
+    } else if (hasCloudDoc) {
+      // 情况3：下载飞书云文档
+      const outputPath = `${workdir}/${options.fileToken}.md`
+
+      console.log(`\n[Step 1/2] 下载飞书云文档...`)
+
+      const downloadResult = await downloadFeishuCloudDoc(
+        options.fileToken,
+        outputPath,
+        feishuConfig
       )
 
       if (!downloadResult.success) {
@@ -454,6 +479,7 @@ program
 
       prompt = `根据 ${outputPath} ${prompt}`
     }
+    // 情况1：纯文字任务，不需要下载
 
     // 增强 prompt，要求 Claude 输出详细信息
     const enhancedPrompt = `${prompt}
@@ -474,7 +500,7 @@ program
 ---`
 
     // 第二步：执行开发任务
-    console.log(hasAttachment ? `\n[Step 2/2] 执行开发任务...` : `\n[Step 1/1] 执行开发任务...`)
+    console.log((hasMessageAttachment || hasCloudDoc) ? `\n[Step 2/2] 执行开发任务...` : `\n[Step 1/1] 执行开发任务...`)
     console.log(`[FeishuExec] 工作目录: ${workdir}`)
 
     const callbackClient = new CallbackClient(config.openClawUrl, config.nodeId)
@@ -509,10 +535,27 @@ program
 
     const result = await executor.execute(task)
 
-    // 异步发送完成通知（不等待）
-    // 注意：Gateway 的 nodes.run 是同步 RPC，超时后会丢弃结果
-    // 所以这里发通知也没用，飞书通知已经通过独立通道发送了
-    // 不再发送完成通知到 Gateway
+    // 异步发送完成通知
+    // 飞书通知通过独立通道发送，即使 Gateway 超时了用户也能收到结果
+    const sendCompletionNotification = async () => {
+      if (notifyTarget) {
+        const event = result.status === TaskStatus.SUCCESS ? 'complete' : 'error'
+        try {
+          await triggerNotifyHook(event, taskId, {
+            status: result.status,
+            nodeId: config.nodeId,
+            output: result.output,
+            error: result.error,
+            exitCode: result.exitCode,
+            target: notifyTarget,
+            workdir
+          })
+          logger.info('Completion notification sent')
+        } catch (err) {
+          logger.warn('Completion notification failed:', (err as Error).message)
+        }
+      }
+    }
 
     // 输出结果
     console.log(`\n${'='.repeat(50)}`)
@@ -522,6 +565,9 @@ program
     }
     console.log(`\n${'='.repeat(50)}`)
     console.log(`Exit code: ${result.exitCode}`)
+
+    // 发送完成通知后再退出
+    await sendCompletionNotification()
     process.exit(result.exitCode || 0)
   })
 

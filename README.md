@@ -52,7 +52,7 @@ npx clawnode run "创建一个 Express Hello World 项目"
 |------|------|
 | `clawnode exec <prompt>` | 执行 Claude Code 命令 |
 | `clawnode run <prompt>` | 执行并发送通知 |
-| `clawnode feishu-exec` | 飞书开发任务（有附件下载，无附件直接执行） |
+| `clawnode feishu-exec` | 飞书开发任务（支持：纯文字、消息附件、云文档） |
 | `clawnode start` | 启动节点服务（推送/轮询模式） |
 | `clawnode status` | 显示节点状态 |
 | `clawnode config` | 显示当前配置 |

@@ -108,14 +108,26 @@ clawnode run -s session-xyz "继续开发用户管理功能"
 
 ## feishu-exec 命令
 
-执行飞书开发任务（有附件先下载再执行，无附件直接执行），自动发送通知到飞书。
+执行飞书开发任务，支持三种类型：
+1. **纯文字任务** - 直接执行 prompt
+2. **消息附件任务** - 下载飞书消息附件后执行
+3. **云文档任务** - 下载飞书云文档后执行
+
+自动发送通知到飞书。
 
 **注意**: 需要先运行 `openclaw node run` 注册 clawnode 身份。
 
 ### 基本用法
 
 ```bash
+# 纯文字任务
 clawnode feishu-exec --prompt "实现计算器功能"
+
+# 消息附件任务（先下载再执行）
+clawnode feishu-exec --message-id "msg_xxx" --file-key "file_xxx" --prompt "实现功能"
+
+# 云文档任务（先下载再执行）
+clawnode feishu-exec --file-token "FKfPdDb3pobslTxKr9acIk1YnPg" --prompt "实现功能"
 ```
 
 ### 选项
@@ -123,10 +135,13 @@ clawnode feishu-exec --prompt "实现计算器功能"
 | 选项 | 说明 | 必填 |
 |------|------|------|
 | `--prompt <text>` | 开发任务描述 | 是 |
-| `--message-id <id>` | 飞书消息 ID（有附件时使用） | 有附件时 |
-| `--file-key <key>` | 飞书文件 Key（有附件时使用） | 有附件时 |
+| `--message-id <id>` | 飞书消息 ID（消息附件时使用） | 消息附件时 |
+| `--file-key <key>` | 飞书文件 Key（消息附件时使用） | 消息附件时 |
+| `--file-token <token>` | 飞书云文档 Token（云文档时使用） | 云文档时 |
 | `--workdir <dir>` | 工作目录（默认使用 WORKDIR 配置） | 否 |
 | `--notify-to <to>` | 通知目标（默认使用 NOTIFY_TARGET 配置） | 否 |
+| `--app-id <id>` | 飞书 App ID | 否（可从环境变量获取） |
+| `--app-secret <secret>` | 飞书 App Secret | 否（可从环境变量获取） |
 
 ### 示例
 
@@ -134,11 +149,17 @@ clawnode feishu-exec --prompt "实现计算器功能"
 # 纯文字消息
 clawnode feishu-exec --prompt "实现一个网页计算器"
 
-# 有附件（下载后执行）
+# 消息附件（下载后执行）
 clawnode feishu-exec --prompt "实现 PRD 中的功能" --message-id "msg_xxx" --file-key "file_xxx"
+
+# 飞书云文档（下载后执行）
+clawnode feishu-exec --file-token "FKfPdDb3pobslTxKr9acIk1YnPg" --prompt "实现云文档中的功能"
 
 # 指定工作目录
 clawnode feishu-exec --workdir "E:/fwwork/javaws" --prompt "创建新项目"
+
+# 临时指定飞书凭证
+clawnode feishu-exec --app-id "cli_xxx" --app-secret "xxx" --prompt "实现功能"
 ```
 
 ### 配置
